@@ -1,0 +1,10 @@
+##gff-version	3	
+#contig00001	
+contig00001	snap	CDS	1429	2511	.	-	Name=contig00001-snap.1	
+contig00001	snap	CDS	5623	5940	.	-	Name=contig00001-snap.2	
+contig00001	snap	CDS	8024	8099	.	+	Name=contig00001-snap.3	
+contig00001	snap	CDS	8286	8407	.	+	Name=contig00001-snap.3	
+contig00001	snap	CDS	8457	8486	.	+	Name=contig00001-snap.3	
+contig00001	snap	CDS	8532	8555	.	+	Name=contig00001-snap.3	
+contig00001	snap	CDS	21863	22351	.	-	Name=contig00001-snap.4	
+contig00001	snap	CDS	22413	22931	.	-	Name=contig00001-snap.5	

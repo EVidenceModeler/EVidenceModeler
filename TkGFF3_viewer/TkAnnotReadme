@@ -1,0 +1,27 @@
+TkAnnotationViewer requires the following perl modules to be installed:
+
+Tk
+XML::Parser
+XML::Simple
+Data::Dumper
+
+
+These can be obtained from CPAN via:
+
+>perl -MCPAN -e shell
+>install XML::Parser
+
+Alternatively, if you have perl installed from http://www.activestate.com
+you can use the ppm tool:
+
+>ppm
+>install XML-Simple
+
+
+After installing the perl modules, you should be able to run the 
+-ultra-light-weight- Annotation viewer by typing
+>perl TkAnnotationviewer.pl
+
+
+Open up one of your TIGR-XML formatted annotation files to view the gene annotations and sequences.
+
