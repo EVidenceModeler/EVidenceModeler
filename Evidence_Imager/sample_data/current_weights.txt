@@ -1,7 +1,0 @@
-genemarkHMM	0.00943308091026681
-nap-AllGroup_minus_rice.niaa	0.222502761079009
-alignAssembly-rice_release4_gmapsim4_02152006	2.44874532174525
-genewise-AllGroup_minus_rice.niaa	0.0890905494590882
-GUDB.all	0.244874532174525
-fgenesh_masked+	0.126180832091946
-glimmerHMM_masked+	0.117694522580519

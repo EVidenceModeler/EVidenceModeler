@@ -1,1 +1,0 @@
-../../evidence_modeler.pl -G rice.genome -L genemarkHMM,glimmerHMM_masked+,fgenesh_masked+ -g gene_predictions.gff3 -e transcript_alignments.gff3 -t pasa.terminal_exons.gff3 -w current_weights.txt  --debug
