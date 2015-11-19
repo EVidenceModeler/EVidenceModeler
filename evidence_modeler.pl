@@ -1700,6 +1700,8 @@ sub parse_evidence_chains {
         my @x = split (/\t/);
         
         my ($ev_type, $lend, $rend, $attributes, $orient) = ($x[1], $x[3], $x[4], $x[8], $x[6]);
+
+        ($lend, $rend) = sort {$a<=>$b} ($lend, $rend); # just in case...
         
         unless (defined ($EVIDENCE_WEIGHTING{$ev_type})) {
             print STDERR "WARNING: not considering ev_type: $ev_type since not included in weights file\n";
