@@ -152,7 +152,7 @@ while (my $seq_obj = $fasta_reader->next()) {
         $file_struct->{acc_file} = $acc_filename;
 
         unless (-e $acc_filename) {
-            system "touch $acc_filename";
+            system "touch \"$acc_filename\"";
             if ($?) { die "Error, died running cmd: touch $acc_filename"; }
         }
         
