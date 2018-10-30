@@ -2309,14 +2309,43 @@ sub has_UTRs {
 ####
 sub has_5prime_UTR {
     my $self = shift;
-    return (scalar ($self->get_5prime_UTR_coords()));
+    return ($self->get_5prime_UTR_length() > 2);
 }
 
 ####
 sub has_3prime_UTR {
     my $self = shift;
-    return(scalar ($self->get_3prime_UTR_coords()));
+    return($self->get_3prime_UTR_length() > 2);
 }
+
+
+####
+sub get_5prime_UTR_length {
+    my $self = shift;
+    my @prime5_UTR_coords = $self->get_5prime_UTR_coords();
+    
+    my $len = 0;
+    for my $coordset (@prime5_UTR_coords) {
+        my ($lend, $rend) = sort {$a<=>$b} @$coordset;
+        $len += ($rend - $lend) + 1;
+    }
+    return($len);
+}
+
+
+####
+sub get_3prime_UTR_length {
+    my $self = shift;
+    my @prime3_UTR_coords = $self->get_3prime_UTR_coords();
+    
+    my $len = 0;
+    for my $coordset (@prime3_UTR_coords) {
+        my ($lend, $rend) = sort {$a<=>$b} @$coordset;
+        $len += ($rend - $lend) + 1;
+    }
+    return($len);
+}
+    
 
 
 =over 4
@@ -3054,7 +3083,36 @@ sub to_GTF_format {
 	$com_name =~ s/[\"\']//g if $com_name;
 	
 	my $name_txt = ($com_name) ? "Name \"$com_name\";" : "";
-	
+
+
+    ## Gene record
+    unless ($preferences{'gene_record_already_done'}) {
+        
+        my ($gene_lend, $gene_rend) = sort {$a<=>$b} $gene_obj->get_gene_span();
+        
+        push (@gtf_text, [$seqname,
+                          $source,
+                          "gene",
+                          $gene_lend,
+                          $gene_rend,
+                          "0",
+                          $orientation,
+                          ".",
+                          "gene_id \"$gene_id\"; $name_txt"]);
+    }
+    
+    ## Transcript record
+    my ($trans_lend, $trans_rend) = sort {$a<=>$b} $gene_obj->get_transcript_span();
+    push (@gtf_text, [$seqname,
+                      $source,
+                      "transcript",
+                      $trans_lend,
+                      $trans_rend,
+                      "0",
+                      $orientation,
+                      ".",
+                      "gene_id \"$gene_id\"; transcript_id \"$transcript_id\"; $name_txt"]);
+    
     unless ($is_pseudogene) {
         $gene_obj->set_CDS_phases($genome_seq_ref);
     
@@ -3117,8 +3175,22 @@ sub to_GTF_format {
     
     }
     
-    ## report the CDS regions:
+    ## report the exons and CDS regions:
     foreach my $exon ($gene_obj_for_gtf->get_exons()) {
+
+        my ($exon_lend, $exon_rend) = sort {$a<=>$b} $exon->get_coords();
+        
+        push (@gtf_text, [$seqname,
+                          $source,
+                          "exon",
+                          $exon_lend,
+                          $exon_rend,
+                          "0",
+                          $orientation,
+                          ".",
+                          "gene_id \"$gene_id\"; transcript_id \"$transcript_id\"; $name_txt"]);
+        
+
         
         my $cds = ($is_pseudogene) ? $exon : $exon->get_CDS_exon_obj();
         
@@ -3191,7 +3263,9 @@ sub to_GTF_format {
     }
     
     foreach my $isoform ($gene_obj->get_additional_isoforms()) {
-        $GTF .= "\n" . $isoform->to_GTF_format($genome_seq_ref, %preferences);
+        my %iso_pref = %preferences;
+        $iso_pref{'gene_record_already_done'} = 1;
+        $GTF .= "\n" . $isoform->to_GTF_format($genome_seq_ref, %iso_pref);
     }
     
     return ($GTF);
@@ -3508,13 +3582,10 @@ sub to_GFF3_format {
     my $asmbl_id = $preferences{seqid} || $gene_obj->{asmbl_id};
     my $source = $preferences{source} || $gene_obj->{source} || ".";
     
-    unless ($asmbl_id) {
-        if ($gene_id =~ /^(\d+)/) {
-            $asmbl_id = $1;
-        } else {
-            die "Error, no asmbl_id from gene_obj\n";
-        }
+    unless (defined $asmbl_id) {
+        confess "Error, no asmbl_id from gene_obj\n";
     }
+    
     
     my ($gene_lend, $gene_rend) = sort {$a<=>$b} $gene_obj->get_gene_span();
     my $com_name = $gene_obj->{com_name};
@@ -3575,7 +3646,7 @@ sub to_GFF3_format {
             
             
             ## annotate 5' utr
-            if ($gene_obj->has_CDS()) {
+            if ($gene_obj->has_CDS() && $gene_obj->has_5prime_UTR()) {
                 my @prime5_utr = $gene_obj->get_5prime_UTR_coords();
                 if (@prime5_utr) {
                     my $utr_count = 0;
@@ -3643,7 +3714,7 @@ sub to_GFF3_format {
             }
             
             ## annotate 3' utr
-            if ($gene_obj->has_CDS()) {
+            if ($gene_obj->has_CDS() && $gene_obj->has_3prime_UTR()) {
                 my @prime3_utr = $gene_obj->get_3prime_UTR_coords();
                 if (@prime3_utr) {
                     my $utr_count = 0;
@@ -4447,6 +4518,26 @@ sub has_CDS {
     }
 
     return (0); # no cds entry found
+}
+
+
+####
+sub set_CDS_phases_from_init_phase {
+    my ($self, $init_phase) = @_;
+
+    my @exons = $self->get_exons();
+
+    my $curr_cds_len = $init_phase;
+    
+    foreach my $exon (@exons) {
+        if (my $cds = $exon->get_CDS_obj()) {
+            $cds->set_phase($curr_cds_len % 3);
+            my $cds_len = $cds->length();
+            $curr_cds_len += $cds_len;
+        }
+    }
+
+    return;
 }
 
 
