@@ -26,7 +26,7 @@ main: {
 		}
 		
 		my @x = split(/\s+/);
-		if ($x[2] eq 'CDS') {
+		if ($x[2] eq "exon") {
 			my $scaffold = $x[0];
 			my $orient = $x[6];
 			my $lend = $x[3];
