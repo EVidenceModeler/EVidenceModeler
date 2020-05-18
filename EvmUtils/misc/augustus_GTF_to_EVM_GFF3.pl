@@ -27,7 +27,7 @@ main: {
 		unless (/\w/) { next; }
 		
 		my @x = split(/\t/);
-		if ($x[2] eq 'CDS') { 
+		if ($x[2] eq 'CDS' || $x[2] eq "stop_codon") { 
 			my $scaffold = $x[0];
 			my $orient = $x[6];
 			my $lend = $x[3];
@@ -77,6 +77,8 @@ main: {
 			$gene_obj->{TU_feat_name} = $gene_id;
 			$gene_obj->{Model_feat_name} = $trans_id;
 			$gene_obj->{com_name} = "$model_type prediction";
+            
+            $gene_obj->join_adjacent_exons();
             
 			print $gene_obj->to_GFF3_format(source => $model_type) . "\n";
 
