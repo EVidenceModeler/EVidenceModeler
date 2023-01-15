@@ -127,7 +127,7 @@ if ($help_flag) {
     die $param_string;
 }
 
-my $evm_bin_dir = $FindBin::Bin . "/../.";
+my $evm_bin_dir = $FindBin::Bin;
 my $evm_cmd = "$evm_bin_dir/evidence_modeler.pl";
 
 ## ensure basenames
