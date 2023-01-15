@@ -48,6 +48,7 @@ my $param_string = <<__PARAMS__;
 #  Misc:
 #
 #  --search_long_introns  <int>  when set, reexamines long introns (can find nested genes, but also can result in FPs) (default: 0 (off))
+#  --report_ELM          report the eliminated EVM preds too.
 #
 #
 #  --re_search_intergenic <int>  when set, reexamines intergenic regions of minimum length (can add FPs) (default: 0  (off))
@@ -96,6 +97,7 @@ my $MIN_LONG_INTRON_LENGTH;
 my $MIN_GENE_LENGTH_SIZE_ON_RE_SEARCH;
 my $MIN_INTERGENIC_SIZE_ON_RE_SEARCH;
 
+my $report_ELM;
 
 &GetOptions ("partitions=s" => \$partitions_file,
              "output_file_name|O=s" => \$output_file_name,
@@ -118,7 +120,8 @@ my $MIN_INTERGENIC_SIZE_ON_RE_SEARCH;
              "re_search_intergenic=i" => \$MIN_GENE_LENGTH_SIZE_ON_RE_SEARCH,
              "terminal_intergenic_re_search=i" => \$MIN_INTERGENIC_SIZE_ON_RE_SEARCH,
              
-             );
+             'report_ELM' => \$report_ELM,
+    );
 
 unless ($output_file_name && $partitions_file && $genomicSeqFile && $genePredictionsFile && $weightsFile) {
     die $param_string;
@@ -170,7 +173,7 @@ $evm_cmd .= " --reverseStrandOnly " if $REVERSE_STRAND_ONLY_FLAG;
 $evm_cmd .= " --search_long_introns $MIN_LONG_INTRON_LENGTH " if $MIN_LONG_INTRON_LENGTH;
 $evm_cmd .= " --re_search_intergenic $MIN_GENE_LENGTH_SIZE_ON_RE_SEARCH " if $MIN_GENE_LENGTH_SIZE_ON_RE_SEARCH;
 $evm_cmd .= " --terminal_intergenic_re_search $MIN_INTERGENIC_SIZE_ON_RE_SEARCH " if $MIN_INTERGENIC_SIZE_ON_RE_SEARCH;
-
+$evm_cmd .= " --report_ELM " if $report_ELM;
 
 open (my $fh, $partitions_file) or die "Error, cannot open $partitions_file";
 while (<$fh>) {
