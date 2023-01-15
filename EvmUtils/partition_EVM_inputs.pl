@@ -30,6 +30,7 @@ the partitioned data and the partitioned data ranges.
 ###############################################################################################
 #
 # Options:
+#  --partition_dir         * :name of directory to write partitions into 
 #  --genome                * :fasta file containing all genome sequences
 #  --gene_predictions      * :file containing gene predictions
 #  --protein_alignments      :file containing protein alignments
@@ -54,11 +55,12 @@ __PARAMS__
 
 my ($genome, $gene_predictions, $protein_alignments, $transcript_alignments,
     $pasaTerminalExons, $repeats, $segmentSize, $overlapSize,
-    $partition_listing, $help
+    $partition_listing, $help, $partition_dir,
     );
 
 
-&GetOptions ('genome=s' => \$genome,
+&GetOptions ('partition_dir=s' => \$partition_dir,
+             'genome=s' => \$genome,
              'gene_predictions=s' => \$gene_predictions,
              'protein_alignments=s' => \$protein_alignments,
              'transcript_alignments=s' => \$transcript_alignments,
@@ -73,7 +75,7 @@ my ($genome, $gene_predictions, $protein_alignments, $transcript_alignments,
 # process required options
 if ($help) { die $param_string; }
 
-unless ($genome && $gene_predictions && $segmentSize && defined($overlapSize) && $partition_listing) {
+unless ($partition_dir && $genome && $gene_predictions && $segmentSize && defined($overlapSize) && $partition_listing) {
     die $param_string;
 }
 
@@ -120,23 +122,33 @@ my $curr_dir = cwd();
 my $util_dir = $FindBin::Bin;
 my $gff_partitioner = "$util_dir/gff_range_retriever.pl";
 
-
-&partition_files_based_on_contig(@files_to_process);
-
-
 open (my $ofh, ">$partition_listing") or die "Error, cannot write $partition_listing file";
+
+if (! -d $partition_dir) {
+    mkdir($partition_dir) or die "Error, cannot mkdir $partition_dir";
+}
+
+&partition_files_based_on_contig($partition_dir, \@files_to_process);
+
+
+
 
 my $fasta_reader = new Fasta_reader($genome);
 while (my $seq_obj = $fasta_reader->next()) {
     
     my $accession = $seq_obj->get_accession();
+    
+    print STDERR "-writing genome seqs for $accession\n";
+    
     my $sequence = $seq_obj->get_sequence();
     my $sequence_length = length($sequence);
     
     ## create accession partition area
-    my $acc_dir = "$curr_dir/$accession";
+    my $accession_adj = $accession;
+    $accession_adj =~ s/\W/_/g;
+    my $acc_dir = "$partition_dir/$accession_adj";
     unless (-d $acc_dir) {
-        mkdir ($acc_dir) or die "Error, cannot mkdir $accession";
+        print STDERR "\t-skipping $accession as no features partitioned.\n";
     }
     
     ## write the genome sequence
@@ -174,7 +186,7 @@ while (my $seq_obj = $fasta_reader->next()) {
             my ($range_lend, $range_rend) = @$range;
             my $range_length = $range_rend - $range_lend + 1;
             
-            my $partition_dir = "$acc_dir/$accession" . "_$range_lend" . "-$range_rend";
+            my $partition_dir = "$acc_dir/$accession_adj" . "_$range_lend" . "-$range_rend";
             mkdir $partition_dir or die "Error, cannot mkdir $partition_dir";
             my $genome_subseq = substr($sequence, $range_lend - 1, $range_length);
             $genome_subseq =~ s/(\S{60})/$1\n/g; #make fasta format
@@ -187,7 +199,7 @@ while (my $seq_obj = $fasta_reader->next()) {
             foreach my $file_struct (@files_to_process) {
                 my $filename = $file_struct->{acc_file};
                 my $basename = $file_struct->{basename};
-                my $cmd = "$gff_partitioner $accession $range_lend $range_rend ADJUST_TO_ONE < $filename > $partition_dir/$basename";
+                my $cmd = "$gff_partitioner \"$accession\" $range_lend $range_rend ADJUST_TO_ONE < $filename > $partition_dir/$basename";
                 &process_cmd($cmd);
             }
             print $ofh "$accession\t$acc_dir\tY\t$partition_dir\n";
@@ -244,10 +256,12 @@ sub process_cmd {
 
 ####
 sub partition_files_based_on_contig {
-    my @file_structs = @_;
+    my ($partition_dir, $file_structs_aref) = @_;
 
-    foreach my $file_struct (@file_structs) {
+    
 
+    foreach my $file_struct (@$file_structs_aref) {
+        
         my $file = $file_struct->{file};
         my $basename = $file_struct->{basename};
         
@@ -260,14 +274,15 @@ sub partition_files_based_on_contig {
             if (/^\#/) { next; } # comment lines
             my @x = split (/\t/);
             my $contig_id = $x[0];
+            $contig_id =~ s/\W/_/g;
             if ($contig_id ne $curr_contig) {
                 $curr_contig = $contig_id;
-                unless (-d "$curr_contig") {
+                unless (-d "$partition_dir/$curr_contig") {
                     print STDERR "writing $file for $curr_contig\n";
-                    mkdir $curr_contig or die "Error, cannot mkdir $curr_contig";
+                    mkdir "$partition_dir/$curr_contig" or die "Error, cannot mkdir $partition_dir/$curr_contig";
                 }
                 close $ofh if $ofh;
-                open ($ofh, ">>$curr_contig/$basename") or die "Error, cannot write to $curr_contig/$basename";
+                open ($ofh, ">>$partition_dir/$curr_contig/$basename") or die "Error, cannot write to $partition_dir/$curr_contig/$basename";
             }
             print $ofh $line;
         }
