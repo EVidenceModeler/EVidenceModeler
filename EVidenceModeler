@@ -1,0 +1,334 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Getopt::Long qw(:config no_ignore_case bundling);
+use Carp;
+use FindBin;
+use lib ("$FindBin::Bin/PerlLib");
+use Pipeliner;
+use Cwd;
+
+my $param_string = <<__PARAMS__;
+
+################# Evidence Modeler ##############################
+#
+#  parameters:
+#
+#  Required:
+# 
+#  --sample_id <str>           sample_id (for naming outputs)
+#  --genome <str>              genome sequence in fasta format
+#  --weights <str>             weights for evidence types file. See documentation for formatting.
+#  --gene_predictions <str>    gene predictions gff3 file
+#
+#  # partitioning info (required too) 
+#  --segmentSize <str>          * :length of a single sequence for running EVM
+#  --overlapSize  <str>         * :length of sequence overlap between segmented sequences
+#
+#
+#  Optional but recommended:
+#  --protein_alignments <str>         protein alignments gff3 file
+#  --transcript_alignments <str>      transcript alignments gff3 file
+#
+#  Optional and miscellaneous
+#
+#  --repeats <str>              gff3 file with repeats masked from genome file
+#
+#  
+#  --terminalExons <str>        supplementary file of additional terminal exons to consider (from PASA long-orfs)
+#
+#  --stop_codons <str>            list of stop codons (default: TAA,TGA,TAG)
+#                                 *for Tetrahymena, set --stop_codons TGA
+#
+#  --min_intron_length <int>      minimum length for an intron (default 20 bp)
+#  --exec_dir <str>               directory that EVM cd's to before running.
+#
+#  --CPU <int>                   number of parallel computes (default: 4)
+#
+#  --search_long_introns  <int>  when set, reexamines long introns (can find nested genes, but also can result in FPs) (default: 0 (off))
+#
+#
+#  --re_search_intergenic <int>  when set, reexamines intergenic regions of minimum length (can add FPs) (default: 0  (off))
+#  --terminal_intergenic_re_search <int>   reexamines genomic regions outside of the span of all predicted genes (default: 10000)
+#
+# flags:
+#
+#  --forwardStrandOnly   runs only on the forward strand
+#  --reverseStrandOnly   runs only on the reverse strand
+#
+#  -S                    verbose flag
+#  --debug               debug mode, writes lots of extra files.
+#  --report_ELM          report the eliminated EVM preds too.
+#
+#
+#################################################################################################################################
+
+
+
+__PARAMS__
+
+    ;
+
+;
+
+#  --stitch_ends             file listing source types to apply end stitching 
+#                                 into existing exons (ie. 'genewise,alignAssembly')
+#  --extend_to_terminal      file listing source types to extend terminal alignment segment into a terminal exon (ie. 'genewise')
+#
+#  --INTERGENIC_SCORE_ADJUST_FACTOR    value <= 1 applied to the calculated intergenic scores  (default 1)
+
+
+my $usage = <<__EOUSAGE__;
+
+    ## Placeholder for additional usage info.
+
+
+__EOUSAGE__
+
+
+    ;
+
+
+my $UTILDIR = "$FindBin::Bin/EvmUtils";
+my $PLUGINS_DIR = "$FindBin::Bin/plugins";
+
+## Input parameters
+my $sample_id;
+my $genomicSeqFile;
+my $genePredictionsFile;
+my $transcriptAlignmentsFile;
+my $proteinAlignmentsFile;
+my $repeatsFile;
+my $weightsFile;
+my $FORWARD_STRAND_ONLY_FLAG;
+my $REVERSE_STRAND_ONLY_FLAG;
+my $terminalExonsFile;
+my $SEE;
+my $DEBUG;
+my $stop_codons_arg;
+my $help_flag;
+my $stitch_ends;
+my $extend_to_terminal; # extend termini of genewise alignments to find a start or stop codon, forming a terminal exon.
+my $min_intron_length = 20; # smallest valid intron length I'm aware of (paramecium)
+my $exec_dir = undef;
+my $report_ELM_flag = 0;  #if set, the ELIMINATED EVM preds are reported too (those that score better as noncoding or are ultra short).
+my $INTERGENIC_SCORE_ADJUST_FACTOR = 1;  # can change the percent of the actual intergenic score that's used in the DP scoring function.
+my $MIN_LONG_INTRON_LENGTH = 0; # minimum intron length to go searching for a gene within an intron
+my $MIN_GENE_LENGTH_SIZE_ON_RE_SEARCH = 0; ## off
+my $MIN_INTERGENIC_SIZE_ON_RE_SEARCH = 10000;
+my $MAX_NUM_PREV_EXONS_COMPARE = 500; # heuristic: arbitrary value, but hopefully long enough to give the same result as complete DP.
+
+
+## hidden opts:
+my $limit_range_lend;
+my $limit_range_rend;
+
+## partitioning inputs
+my $segmentSize; 
+my $overlapSize;
+
+my $CPU = 4;
+
+## end params
+
+
+
+&GetOptions ("sample_id=s" => \$sample_id,
+             "genome|G=s"=>\$genomicSeqFile,
+             "gene_predictions|g=s"=>\$genePredictionsFile,
+             "transcript_alignments|e=s"=>\$transcriptAlignmentsFile,
+             "protein_alignments|p=s" => \$proteinAlignmentsFile,
+             "repeats|r=s"=>\$repeatsFile,
+             "weights|w=s"=>\$weightsFile,
+             "forwardStrandOnly"=>\$FORWARD_STRAND_ONLY_FLAG,
+             "reverseStrandOnly"=>\$REVERSE_STRAND_ONLY_FLAG,
+             "terminalExonsFile|t=s"=>\$terminalExonsFile,
+             "S"=>\$SEE,
+             "debug" => \$DEBUG,
+             "stop_codons=s" => \$stop_codons_arg,
+             "help|h" => \$help_flag,
+             "stitch_ends=s" => \$stitch_ends,
+             "extend_to_terminal=s" => \$extend_to_terminal,
+             "min_intron_length=i" => \$min_intron_length,
+             "exec_dir=s" => \$exec_dir,
+             "report_ELM" => \$report_ELM_flag,
+             "INTERGENIC_SCORE_ADJUST_FACTOR=f" => \$INTERGENIC_SCORE_ADJUST_FACTOR,
+
+             "search_long_introns=i" => \$MIN_LONG_INTRON_LENGTH,
+             "re_search_intergenic=i" => \$MIN_GENE_LENGTH_SIZE_ON_RE_SEARCH,
+             "terminal_intergenic_re_search=i" => \$MIN_INTERGENIC_SIZE_ON_RE_SEARCH,
+             
+             # hidden opts
+             "limit_range_lend=i" => \$limit_range_lend,
+             "limit_range_rend=i" => \$limit_range_rend,
+
+             'trellis_search_limit=i' => \$MAX_NUM_PREV_EXONS_COMPARE,
+             
+             'segmentSize=i' => \$segmentSize,
+             'overlapSize=i' => \$overlapSize,
+    
+             'CPU=i' => \$CPU,
+    );
+
+if ($help_flag) {
+    die "$param_string\n\n$usage\n";
+}
+
+
+if ($FORWARD_STRAND_ONLY_FLAG && $REVERSE_STRAND_ONLY_FLAG) {
+    die "Error, --forwardStrandOnly and --reverseStrandOnly are mutually exclusive ";
+}
+
+## check required options.
+unless ($sample_id && $genomicSeqFile && $genePredictionsFile && $weightsFile &&
+        $segmentSize && $overlapSize) {
+    die $param_string . "\n\n*** Please check your required parameter settings - missing or misspelled. ***";
+}
+
+
+
+my $checkpts_dir = "__${sample_id}-EVM_chckpts";
+unless (-d $checkpts_dir) {
+    mkdir $checkpts_dir or die "Error, cannot create checkpoints dir: $checkpts_dir";
+}
+my $pipeliner = new Pipeliner(-verbose=>2,
+                              -checkpoint_dir=>$checkpts_dir,
+                              -cmds_log=> "$checkpts_dir.cmds_log",
+    );
+
+
+$genomicSeqFile = Cwd::abs_path($genomicSeqFile);
+$genePredictionsFile = Cwd::abs_path($genePredictionsFile);
+
+######################
+# partition EVM inputs
+
+my $cmd = "$UTILDIR/partition_EVM_inputs.pl "
+    . " --partition_dir ${sample_id}.partitions "
+    . " --genome $genomicSeqFile "
+    . " --gene_predictions $genePredictionsFile ";
+
+if ($proteinAlignmentsFile) {
+    $proteinAlignmentsFile = Cwd::abs_path($proteinAlignmentsFile);
+    $cmd .= " --protein_alignments $proteinAlignmentsFile ";
+}
+if ($transcriptAlignmentsFile) {
+    $transcriptAlignmentsFile = Cwd::abs_path($transcriptAlignmentsFile);
+    $cmd .= " --transcript_alignments $transcriptAlignmentsFile ";
+}
+if ($repeatsFile) {
+    $repeatsFile = Cwd::abs_path($repeatsFile);
+    $cmd .= " --repeats $repeatsFile ";
+}
+if ($terminalExonsFile) {
+    $terminalExonsFile = Cwd::abs_path($terminalExonsFile);
+    $cmd .= " --pasaTerminalExons $terminalExonsFile ";
+}
+
+$cmd .= " --segmentSize $segmentSize --overlapSize $overlapSize ";
+
+$cmd .= " --partition_listing ${sample_id}.partitions.listing";
+
+$pipeliner->add_commands(new Command($cmd, "partition_inputs.ok"));
+
+
+########################
+# make the EVM commands:
+
+$weightsFile = Cwd::abs_path($weightsFile);
+
+$cmd = "$UTILDIR/write_EVM_commands.pl "
+    . " --genome $genomicSeqFile "
+    . " --weights $weightsFile "
+    . " --gene_predictions $genePredictionsFile ";
+if ($proteinAlignmentsFile) {
+    $cmd .=  " --protein_alignments $proteinAlignmentsFile ";
+}
+if ($transcriptAlignmentsFile) {
+    $cmd .= " --transcript_alignments $transcriptAlignmentsFile ";
+}
+if ($repeatsFile) {
+    $cmd .= " --repeats $repeatsFile ";
+}
+if ($terminalExonsFile) {
+    $cmd .= " --terminalExons $terminalExonsFile ";
+}
+if ($stop_codons_arg) {
+    $cmd .= " --stop_codons $stop_codons_arg ";
+}
+if ($min_intron_length) {
+    $cmd .= " --min_intron_length $min_intron_length ";
+}
+if ($FORWARD_STRAND_ONLY_FLAG) {
+    $cmd .= " --forwardStrandOnly ";
+}
+elsif ($REVERSE_STRAND_ONLY_FLAG) {
+    $cmd .= " --reverseStrandOnly ";
+}
+if ($MIN_LONG_INTRON_LENGTH) {
+    $cmd .= " --search_long_introns  $MIN_LONG_INTRON_LENGTH ";
+}
+if ($MIN_GENE_LENGTH_SIZE_ON_RE_SEARCH) {
+    $cmd .= " --re_search_intergenic $MIN_GENE_LENGTH_SIZE_ON_RE_SEARCH ";
+}
+if ($MIN_INTERGENIC_SIZE_ON_RE_SEARCH) {
+    $cmd .= " --terminal_intergenic_re_search $MIN_INTERGENIC_SIZE_ON_RE_SEARCH ";
+}
+if ($report_ELM_flag) {
+    $cmd .- " --report_ELM ";
+}
+
+$cmd .= " --output_file_name evm.out  --partitions ${sample_id}.partitions.listing  > ${sample_id}.partitions.evm_cmds";
+
+$pipeliner->add_commands(new Command($cmd, "write_evm_cmds.ok"));
+
+
+##################################
+## Run the commands using parafly:
+
+$cmd = "$PLUGINS_DIR/ParaFly/bin/ParaFly -c ${sample_id}.partitions.evm_cmds -CPU $CPU -vv -max_retry 1 -failed_cmds ${sample_id}.failed_cmds -shuffle ";
+$pipeliner->add_commands(new Command($cmd, "run_evm_cmds.parafly.ok"));
+
+
+
+####################################################
+## Recombine any partial outputs from the partitions
+
+$cmd = "$UTILDIR/recombine_EVM_partial_outputs.pl --partitions ${sample_id}.partitions.listing --output_file_name evm.out";
+$pipeliner->add_commands(new Command($cmd, "recombined_EVM_partial_outputs.ok"));
+
+
+################################
+## Convert to GFF3 output format
+
+$cmd = "$UTILDIR/convert_EVM_outputs_to_GFF3.pl  --partitions ${sample_id}.partitions.listing  --output evm.out  --genome $genomicSeqFile";
+$pipeliner->add_commands(new Command($cmd, "evm_out_to_gff3_format.ok"));
+
+
+#####################################################
+# Capture final gff3 outputs into single output file:
+
+$cmd = "find ./${sample_id}.partitions -regex \".*evm.out.gff3\" -exec cat {} \\; > ${sample_id}.EVM.gff3";
+$pipeliner->add_commands(new Command($cmd, "concatenate_final_output_gff3.ok"));
+
+
+$cmd = "$UTILDIR/gff3_file_to_proteins.pl ${sample_id}.EVM.gff3 $genomicSeqFile prot > ${sample_id}.EVM.pep";
+$pipeliner->add_commands(new Command($cmd, "make_evm_pep.ok"));
+
+$cmd = "$UTILDIR/gff3_file_to_proteins.pl ${sample_id}.EVM.gff3 $genomicSeqFile CDS > ${sample_id}.EVM.cds";
+$pipeliner->add_commands(new Command($cmd, "make_evm_cds.ok"));
+
+$cmd = "set -eou pipefail && $UTILDIR/gene_gff3_to_bed.pl ${sample_id}.EVM.gff3 | sort -k1,1 -k2,2g -k3,3g > ${sample_id}.EVM.bed";
+$pipeliner->add_commands(new Command($cmd, "make_bed.ok"));
+
+
+
+
+$pipeliner->run();
+
+
+exit(0);
+
+
+
