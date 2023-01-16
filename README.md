@@ -1,5 +1,7 @@
 # EVidenceModeler
 
+See [Wiki](https://github.com/EVidenceModeler/EVidenceModeler/wiki) for documentation
+
 Run 'make' to build the required ParaFly cmd parallel execution utility.
 
 (If plugins/ParaFly is missing, first run:
