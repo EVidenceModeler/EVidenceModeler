@@ -9,7 +9,10 @@ use lib ("$FindBin::Bin/PerlLib");
 use Pipeliner;
 use Cwd;
 
-my $param_string = <<__PARAMS__;
+
+my $VERSION = "EVidenceModeler-v2.0.0";
+
+my $usage = <<__PARAMS__;
 
 ################# Evidence Modeler ##############################
 #
@@ -61,6 +64,7 @@ my $param_string = <<__PARAMS__;
 #  --debug               debug mode, writes lots of extra files.
 #  --report_ELM          report the eliminated EVM preds too.
 #
+#  --version             report version ($VERSION) and exit.
 #
 #################################################################################################################################
 
@@ -78,16 +82,6 @@ __PARAMS__
 #
 #  --INTERGENIC_SCORE_ADJUST_FACTOR    value <= 1 applied to the calculated intergenic scores  (default 1)
 
-
-my $usage = <<__EOUSAGE__;
-
-    ## Placeholder for additional usage info.
-
-
-__EOUSAGE__
-
-
-    ;
 
 
 my $UTILDIR = "$FindBin::Bin/EvmUtils";
@@ -132,6 +126,7 @@ my $CPU = 4;
 
 ## end params
 
+my $version_flag = 0;
 
 
 &GetOptions ("sample_id=s" => \$sample_id,
@@ -169,10 +164,19 @@ my $CPU = 4;
              'overlapSize=i' => \$overlapSize,
     
              'CPU=i' => \$CPU,
+
+             'version' => \$version_flag,
     );
 
+
 if ($help_flag) {
-    die "$param_string\n\n$usage\n";
+    die "$usage\n";
+}
+
+
+if ($version_flag) {
+    print STDERR "$VERSION\n";
+    exit(0);
 }
 
 
@@ -183,7 +187,40 @@ if ($FORWARD_STRAND_ONLY_FLAG && $REVERSE_STRAND_ONLY_FLAG) {
 ## check required options.
 unless ($sample_id && $genomicSeqFile && $genePredictionsFile && $weightsFile &&
         $segmentSize && $overlapSize) {
-    die $param_string . "\n\n*** Please check your required parameter settings - missing or misspelled. ***";
+
+    my $missing_count = 0;
+    my $error_msg = "";
+    unless ($sample_id) {
+        $error_msg .= " - missing --sample_id param\n";
+        $missing_count += 1;
+    }
+    unless ($genomicSeqFile) {
+        $error_msg .= " - missing --genome \n";
+        $missing_count += 1;
+    }
+    unless ($genePredictionsFile) {
+        $error_msg .= " - missing --gene_predictions \n";
+        $missing_count += 1;
+    }
+    unless ($weightsFile) {
+        $error_msg .= " - missing --weights \n";
+        $missing_count += 1;
+    }
+    unless ($segmentSize) {
+        $error_msg .= " - missing --segmentSize (cannot be zero) \n";
+        $missing_count += 1;
+    }
+    unless ($overlapSize) {
+        $error_msg .= " - missing --overlapSize (cannot be zero) \n";
+        $missing_count += 1;
+    }
+    
+    if ($missing_count > 2) {
+        die $usage;
+    }
+    else {
+        die $error_msg;
+    }
 }
 
 
@@ -276,7 +313,7 @@ if ($MIN_INTERGENIC_SIZE_ON_RE_SEARCH) {
     $cmd .= " --terminal_intergenic_re_search $MIN_INTERGENIC_SIZE_ON_RE_SEARCH ";
 }
 if ($report_ELM_flag) {
-    $cmd .- " --report_ELM ";
+    $cmd .= " --report_ELM ";
 }
 
 $cmd .= " --output_file_name evm.out  --partitions ${sample_id}.partitions.listing  > ${sample_id}.partitions.evm_cmds";
