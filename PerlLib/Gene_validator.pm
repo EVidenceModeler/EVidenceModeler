@@ -14,7 +14,7 @@ package Gene_validator;
 require Exporter;
 use Gene_obj;
 use strict;
-use DBI;
+#use DBI;
 
 use vars qw ($SEE $DEBUG @ISA @EXPORT); ## set in script using this module for verbose output.
 @ISA = qw(Exporter);
