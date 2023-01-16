@@ -319,7 +319,7 @@ $pipeliner->add_commands(new Command($cmd, "make_evm_pep.ok"));
 $cmd = "$UTILDIR/gff3_file_to_proteins.pl ${sample_id}.EVM.gff3 $genomicSeqFile CDS > ${sample_id}.EVM.cds";
 $pipeliner->add_commands(new Command($cmd, "make_evm_cds.ok"));
 
-$cmd = "set -eou pipefail && $UTILDIR/gene_gff3_to_bed.pl ${sample_id}.EVM.gff3 | sort -k1,1 -k2,2g -k3,3g > ${sample_id}.EVM.bed";
+$cmd = "bash -c \"set -eou pipefail && $UTILDIR/gene_gff3_to_bed.pl ${sample_id}.EVM.gff3 | sort -k1,1 -k2,2g -k3,3g > ${sample_id}.EVM.bed \" ";
 $pipeliner->add_commands(new Command($cmd, "make_bed.ok"));
 
 
