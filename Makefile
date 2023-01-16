@@ -1,8 +1,12 @@
 all: parafly
 
+OS := $(shell uname)
+
+CXX = g++
+CC = gcc
 
 parafly:
-	cd plugins/ParaFly && ./configure --prefix=`pwd` && make && make install
+	cd plugins/ParaFly && sh ./configure --prefix=`pwd` CXX=$(CXX) CC=$(CC) CFLAGS="-fopenmp" CXXFLAGS="-fopenmp" && $(MAKE) install 
 
 
 
