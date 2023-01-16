@@ -122,16 +122,33 @@ my $curr_dir = cwd();
 my $util_dir = $FindBin::Bin;
 my $gff_partitioner = "$util_dir/gff_range_retriever.pl";
 
-open (my $ofh, ">$partition_listing") or die "Error, cannot write $partition_listing file";
+
 
 if (! -d $partition_dir) {
     mkdir($partition_dir) or die "Error, cannot mkdir $partition_dir";
 }
 
-&partition_files_based_on_contig($partition_dir, \@files_to_process);
+my $features_partitioned_checkpoint = "$partition_dir/features_partitioned.ok";
+if (-e $features_partitioned_checkpoint) {
+    print STDERR "-already partitioned features. Skipping feature partitioning.\n";
+}
+else {
+    &partition_files_based_on_contig($partition_dir, \@files_to_process);
+    system("touch $features_partitioned_checkpoint");
+}
 
 
+my $sequence_partitioning_checkpoint = "$partition_dir/seqs_partitioned.ok";
+if (-e $sequence_partitioning_checkpoint) {
+    print STDERR "-already partitioned sequences. Skipping seq partitioning step.\n";
+    exit(0);
+}
 
+
+###################################################
+## partition features and sequences based on chunks
+
+open (my $ofh, ">$partition_listing") or die "Error, cannot write $partition_listing file";
 
 my $fasta_reader = new Fasta_reader($genome);
 while (my $seq_obj = $fasta_reader->next()) {
@@ -149,6 +166,7 @@ while (my $seq_obj = $fasta_reader->next()) {
     my $acc_dir = "$partition_dir/$accession_adj";
     unless (-d $acc_dir) {
         print STDERR "\t-skipping $accession as no features partitioned.\n";
+        next;
     }
     
     ## write the genome sequence
@@ -168,8 +186,6 @@ while (my $seq_obj = $fasta_reader->next()) {
             if ($?) { die "Error, died running cmd: touch $acc_filename"; }
         }
         
-        #my $cmd = "$gff_partitioner $accession 1 $sequence_length < $filename > $acc_filename";
-        #&process_cmd($cmd);
     }
     
     my @ranges = &get_range_list($sequence_length);
@@ -187,27 +203,40 @@ while (my $seq_obj = $fasta_reader->next()) {
             my $range_length = $range_rend - $range_lend + 1;
             
             my $partition_dir = "$acc_dir/$accession_adj" . "_$range_lend" . "-$range_rend";
-            mkdir $partition_dir or die "Error, cannot mkdir $partition_dir";
-            my $genome_subseq = substr($sequence, $range_lend - 1, $range_length);
-            $genome_subseq =~ s/(\S{60})/$1\n/g; #make fasta format
-            
-            open (my $part_ofh, ">$partition_dir/$genome_basename") or die "Error, cannot write to $partition_dir/$genome_basename";
-            print $part_ofh ">$accession\n";
-            print $part_ofh $genome_subseq;
-            close $part_ofh;
-            
-            foreach my $file_struct (@files_to_process) {
-                my $filename = $file_struct->{acc_file};
-                my $basename = $file_struct->{basename};
-                my $cmd = "$gff_partitioner \"$accession\" $range_lend $range_rend ADJUST_TO_ONE < $filename > $partition_dir/$basename";
-                &process_cmd($cmd);
+            #mkdir $partition_dir or die "Error, cannot mkdir $partition_dir";
+            if (! -d $partition_dir) {
+                confess "Error, missing partition dir: $partition_dir";
             }
-            print $ofh "$accession\t$acc_dir\tY\t$partition_dir\n";
+
+            my $chunk_checkpoint = "$partition_dir/chunk.ok";
+            if (-e $chunk_checkpoint) {
+                print STDERR "-already prepped chunk $partition_dir - skipping\n";
+            } 
+            else {
+                my $genome_subseq = substr($sequence, $range_lend - 1, $range_length);
+                $genome_subseq =~ s/(\S{60})/$1\n/g; #make fasta format
+                
+                open (my $part_ofh, ">$partition_dir/$genome_basename") or die "Error, cannot write to $partition_dir/$genome_basename";
+                print $part_ofh ">$accession\n";
+                print $part_ofh $genome_subseq;
+                close $part_ofh;
+                
+                foreach my $file_struct (@files_to_process) {
+                    my $filename = $file_struct->{acc_file};
+                    my $basename = $file_struct->{basename};
+                    my $cmd = "$gff_partitioner \"$accession\" $range_lend $range_rend ADJUST_TO_ONE < $filename > $partition_dir/$basename";
+                    &process_cmd($cmd);
+                }
+                system("touch $chunk_checkpoint");
+            }
+            print $ofh "$accession\t$acc_dir\tY\t$partition_dir\n"; # always writing to partions list file.
         }
     }
 }
 
 close $ofh;
+
+system("touch $sequence_partitioning_checkpoint");
 
 
 exit(0);
