@@ -203,11 +203,11 @@ while (my $seq_obj = $fasta_reader->next()) {
             my $range_length = $range_rend - $range_lend + 1;
             
             my $partition_dir = "$acc_dir/$accession_adj" . "_$range_lend" . "-$range_rend";
-            #mkdir $partition_dir or die "Error, cannot mkdir $partition_dir";
+            
             if (! -d $partition_dir) {
-                confess "Error, missing partition dir: $partition_dir";
+                mkdir $partition_dir or confess "Error, cannot mkdir $partition_dir";    
             }
-
+            
             my $chunk_checkpoint = "$partition_dir/chunk.ok";
             if (-e $chunk_checkpoint) {
                 print STDERR "-already prepped chunk $partition_dir - skipping\n";
