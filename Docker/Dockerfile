@@ -71,7 +71,7 @@ ENV BIN /usr/local/bin
 WORKDIR $SRC
 
 ENV EVM_VERSION=2.0.0
-ENV EVM_CO=828ae4a6c651b1dd3d79289d49d9c9a23e5ae01a
+ENV EVM_CO=fbd224abec844ff2ba751ba684b14415e7a7d400
 
 RUN git clone https://github.com/EVidenceModeler/EVidenceModeler.git && \
     cd EVidenceModeler && \
