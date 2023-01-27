@@ -4,22 +4,24 @@ use strict;
 use warnings;
 
 use FindBin;
-use lib ("$FindBin::Bin/../../PerlLib");
+use lib "$FindBin::Bin/../../PerlLib";
 use Gene_obj;
 
-my $usage = "usage: $0 cufflinks.gtf\n\n";
+my $usage = "usage: $0 align.gtf ev_type\n\n";
 
-my $cufflinks_gtf = $ARGV[0] or die $usage;
-
+my $align_gtf = $ARGV[0] or die $usage;
+my $ev_type = $ARGV[1] or die $usage;
 
 main: {
 	
 	my %genome_trans_to_coords;
 	
-	open (my $fh, $cufflinks_gtf) or die "Error, cannot open file $cufflinks_gtf";
+	open (my $fh, $align_gtf) or die "Error, cannot open file $align_gtf";
 	while (<$fh>) {
 		chomp;
-		
+
+        if (/^\#/) { next; } # comment
+        
 		unless (/\w/) { next; }
 		
 		my @x = split(/\t/);
@@ -78,13 +80,13 @@ main: {
 
 				$gene_obj->{TU_feat_name} = $gene_id;
 				$gene_obj->{Model_feat_name} = $trans_id;
-				$gene_obj->{com_name} = "cufflinks $gene_id $trans_id";
+				$gene_obj->{com_name} = "$ev_type $gene_id $trans_id";
 				
 				$gene_obj->{asmbl_id} = $scaff;
 				
 				$gene_obj->populate_gene_object($coords_href, $coords_href);
 			
-				print $gene_obj->to_alignment_GFF3_format($trans_id, "cuff-$trans_id", "Cufflinks");
+				print $gene_obj->to_alignment_GFF3_format($trans_id, "$ev_type-$trans_id", "$ev_type");
 				
 				print "\n";
 			}
