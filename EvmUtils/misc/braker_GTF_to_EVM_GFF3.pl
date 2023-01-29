@@ -71,6 +71,8 @@ main: {
         
         my $models_href = $data{$scaffold};
 
+        my %gene_id_to_gene_obj;
+        
         foreach my $model (keys %$models_href) {
 
             my $source_type = $gene_to_source_type{$model} or die "Error, no source type defined for $model";
@@ -85,9 +87,27 @@ main: {
             $gene_obj->{TU_feat_name} = $gene_id;
             $gene_obj->{Model_feat_name} = $trans_id;
             $gene_obj->{com_name} = "$source_type prediction";
+            $gene_obj->{source_type} = $source_type;
             
             $gene_obj->join_adjacent_exons();
-                        
+
+            if (exists $gene_id_to_gene_obj{$gene_id}) {
+                $gene_id_to_gene_obj{$gene_id}->add_isoform($gene_obj);
+            }
+            else {
+                $gene_id_to_gene_obj{$gene_id} = $gene_obj;
+            }
+
+        }
+
+        foreach my $gene_id (keys %gene_id_to_gene_obj) {
+
+            my $gene_obj = $gene_id_to_gene_obj{$gene_id};
+
+            $gene_obj->refine_gene_object();
+            
+            my $source_type = $gene_obj->{source_type};
+            
             print $gene_obj->to_GFF3_format(source => $source_type) . "\n";
 
         }
