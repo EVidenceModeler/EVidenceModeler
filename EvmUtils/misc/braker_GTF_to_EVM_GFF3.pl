@@ -8,7 +8,7 @@ use FindBin;
 use lib ("$FindBin::Bin/../../PerlLib");
 use Gene_obj;
 
-my $model_type = "Augustus";
+
 
 my $usage = "usage: $0 augustus.gff.output\n\n";
 
@@ -16,7 +16,8 @@ my $input_file = $ARGV[0] or die $usage;
 
 main: {
     my %data;
-
+    my %gene_to_source_type;
+    
     my $scaffold = "";
 
     ## parse input file
@@ -29,6 +30,7 @@ main: {
         my @x = split(/\t/);
         if ($x[2] eq 'CDS') { 
             my $scaffold = $x[0];
+            my $source_type = $x[1];
             my $orient = $x[6];
             my $lend = $x[3];
             my $rend = $x[4];
@@ -56,6 +58,8 @@ main: {
             my $model = join("$;", $gene_id, $trans_id);
             
             $data{$scaffold}->{$model}->{$end5} = $end3;
+            $gene_to_source_type{$model} = $source_type;
+            
         }
     }
     
@@ -69,6 +73,8 @@ main: {
 
         foreach my $model (keys %$models_href) {
 
+            my $source_type = $gene_to_source_type{$model} or die "Error, no source type defined for $model";
+            
             my ($gene_id, $trans_id) = split(/$;/, $model);
 
             my $coords_href = $models_href->{$model};
@@ -78,16 +84,16 @@ main: {
             $gene_obj->{asmbl_id} = $scaffold;
             $gene_obj->{TU_feat_name} = $gene_id;
             $gene_obj->{Model_feat_name} = $trans_id;
-            $gene_obj->{com_name} = "$model_type prediction";
+            $gene_obj->{com_name} = "$source_type prediction";
             
             $gene_obj->join_adjacent_exons();
-            
-            print $gene_obj->to_GFF3_format(source => $model_type) . "\n";
+                        
+            print $gene_obj->to_GFF3_format(source => $source_type) . "\n";
 
         }
 
     }
-
+    
 
     exit(0);
 
