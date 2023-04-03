@@ -1,0 +1,6 @@
+# Release 2.1.0
+- added gff3 converters for braker gtf, a snap output format variant, and miniprot (thx, Kresimir!)
+
+# Release 2.0.0 - Jan 17, 2023
+- Software is restructured to simplify execution through a single EVidenceModeler command. ParaFly is included as a plugin for parallel command execution.
+- Docker and Singularity images are available.
