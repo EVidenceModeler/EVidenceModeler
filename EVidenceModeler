@@ -10,7 +10,7 @@ use Pipeliner;
 use Cwd;
 
 
-my $VERSION = "EVidenceModeler-v2.0.0";
+my $VERSION = "EVidenceModeler-v2.1.0";
 
 my $usage = <<__PARAMS__;
 
