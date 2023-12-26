@@ -1,5 +1,10 @@
 # EVidenceModeler
 
+Note, as of 2024, EVidenceModeler is no longer being supported or actively maintained by the author. 
+
+Please seek alternatives as needed.
+
+
 See [Wiki](https://github.com/EVidenceModeler/EVidenceModeler/wiki) for documentation
 
 Run 'make' to build the required ParaFly cmd parallel execution utility.
