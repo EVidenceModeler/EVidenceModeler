@@ -58,7 +58,7 @@ foreach my $accession (keys %base_directories) {
     
     print "// Processing $accession, $base_directory\n";
     
-    my $cmd = "$bindir/EVM_to_GFF3.pl $base_directory/$output_file_name $accession > $base_directory/$output_file_name.gff3";
+    my $cmd = "$bindir/EVM_to_GFF3.pl $base_directory/$output_file_name '$accession' > $base_directory/$output_file_name.gff3";
     my $ret = system $cmd;
     if ($ret) {
         die "Error, cmd $cmd died with ret $ret ";
