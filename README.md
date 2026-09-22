@@ -2,6 +2,8 @@
 
 Note, as of 2024, EVidenceModeler is no longer being supported or actively maintained by the author. 
 
+Also note there is now a RUST implementation separately available at [https://github.com/hyphaltip/EVidenceModeler_rust](https://github.com/hyphaltip/EVidenceModeler_rust)
+
 Please seek alternatives as needed.
 
 
